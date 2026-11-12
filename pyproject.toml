@@ -1,0 +1,76 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cyberforge-x"
+version = "1.0.0"
+description = "CyberForge-X - modular, authorization-gated security assessment framework"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "CyberForge-X Contributors" }]
+keywords = ["security", "penetration-testing", "reconnaissance", "owasp", "audit"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Intended Audience :: Information Technology",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Topic :: Security",
+]
+dependencies = [
+  "requests>=2.31,<3",
+  "urllib3>=2.0,<3",
+  "rich>=13.7,<15",
+  "PyYAML>=6.0,<7",
+  "dnspython>=2.4,<3",
+  "beautifulsoup4>=4.12,<5",
+  "paramiko>=3.4,<5",
+  "PyJWT>=2.8,<3",
+  "cryptography>=42,<47",
+  "Jinja2>=3.1,<4",
+  "mmh3>=4.1,<6",
+]
+
+[project.optional-dependencies]
+full = [
+  "impacket>=0.12,<0.14",
+  "pymongo>=4.6,<5",
+]
+dev = [
+  "pytest>=8.0,<10",
+  "ruff>=0.6,<1",
+]
+
+[project.scripts]
+cyberforge = "cyberforge.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/"
+
+[tool.setuptools.packages.find]
+include = ["cyberforge*"]
+
+[tool.setuptools.package-data]
+cyberforge = [
+  "data/wordlists/*.txt",
+  "intel/data/*.json",
+  "reporting/templates/*.j2",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+exclude = [".venv", "build", "dist", "cyberforge-output"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "C4", "SIM"]
+ignore = ["E501", "B008", "SIM108"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]

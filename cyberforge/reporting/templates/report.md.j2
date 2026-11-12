@@ -1,0 +1,243 @@
+# {{ engagement }} — Security Assessment
+
+**Prepared by:** {{ tool_name }} {{ tool_version }}  
+**Generated:** {{ generated_at }}  
+**Assessment window:** {{ report.started_at | datetime }} to {{ report.finished_at | datetime }}  
+**Overall risk:** **{{ risk_rating }}**
+
+> {{ tool_name }} performs authorized, non-destructive security testing. Results require analyst validation before remediation or disclosure. See the limitations and authorized-use notice at the end of this report.
+
+## Executive Summary
+
+The assessment covered {{ report.targets | length }} authorized target(s) across the following modules: {{ modules | join(", ") }}. A total of **{{ findings_total }}** finding(s) were recorded.
+
+| Severity | Count |
+| --- | ---: |
+| Critical | {{ severity_counts.critical }} |
+| High | {{ severity_counts.high }} |
+| Medium | {{ severity_counts.medium }} |
+| Low | {{ severity_counts.low }} |
+| Informational | {{ severity_counts.info }} |
+
+The overall rating is **{{ risk_rating }}**. Prioritize confirmed critical/high findings, exposed credentials, and attack chains that combine multiple weaknesses.
+
+## Scope and Authorization
+
+- **Engagement:** {{ engagement }}
+- **Authorized by:** {{ scope.authorized_by | default("not recorded") }}
+- **Authorization reference:** {{ scope.authorization_ref | default("not recorded") }}
+- **Scope file SHA-256:** `{{ scope.scope_sha256 | default("n/a") }}`
+- **Allowed hosts:** {{ scope.allowed_hosts | join(", ") if scope.allowed_hosts else "none" }}
+- **Allowed CIDRs:** {{ scope.allowed_cidrs | join(", ") if scope.allowed_cidrs else "none" }}
+- **Excluded hosts:** {{ scope.excluded_hosts | join(", ") if scope.excluded_hosts else "none" }}
+- **Allowed ports:** {{ scope.allowed_ports | join(", ") if scope.allowed_ports else "all" }}
+- **Credential attacks authorized:** {{ scope.allow_credential_attacks | default(false) }}
+- **Write tests authorized:** {{ scope.allow_write_tests | default(false) }}
+
+Targets:
+
+{% for target in report.targets %}
+- `{{ target }}`
+{% endfor %}
+
+## Findings
+
+{% if findings_total == 0 %}
+No findings were recorded. This does not prove the absence of vulnerabilities; coverage depends on discovery and access.
+{% endif %}
+
+{% for group in groups %}
+{% if group.count %}
+### {{ group.label }} ({{ group.count }})
+
+{% for finding in group.findings %}
+#### {{ finding.title }}
+
+- **Severity:** {{ group.label }}
+- **CVSS:** {{ finding.cvss | cvss }}
+- **Module:** {{ finding.module }}
+- **Target:** `{{ finding.target }}`
+- **Confidence:** {{ finding.confidence }}
+- **Finding ID:** {{ finding.id }}
+{% if finding.cve_ids %}
+- **CVE:** {{ finding.cve_ids | join(", ") }}
+{% endif %}
+{% if finding.tags %}
+- **Tags:** {{ finding.tags | join(", ") }}
+{% endif %}
+
+{{ finding.description }}
+
+{% if finding.evidence.payload %}
+**Evidence — payload**
+
+<pre>{{ finding.evidence.payload }}</pre>
+{% endif %}
+{% if finding.evidence.request %}
+**Evidence — request**
+
+<pre>{{ finding.evidence.request }}</pre>
+{% endif %}
+{% if finding.evidence.response_excerpt %}
+**Evidence — response / observation**
+
+<pre>{{ finding.evidence.response_excerpt }}</pre>
+{% endif %}
+{% if finding.evidence.notes %}
+**Notes**
+
+{{ finding.evidence.notes }}
+{% endif %}
+
+**Remediation**
+
+{{ finding.remediation }}
+
+{% if finding.reproduction %}
+**Reproduction**
+
+<pre>{{ finding.reproduction }}</pre>
+{% endif %}
+{% if finding.references %}
+**References**
+
+{% for reference in finding.references %}
+- {{ reference }}
+{% endfor %}
+{% endif %}
+
+---
+{% endfor %}
+{% endif %}
+{% endfor %}
+
+## Attack Chains
+
+{% if chains %}
+{% for chain in chains %}
+### {{ chain.name }}
+
+- **Target:** `{{ chain.target }}`
+- **Executed:** {{ chain.executed }}
+- **Description:** {{ chain.description }}
+
+{% for step in chain.steps %}
+{{ loop.index }}. **{{ step.action }}** — {{ step.result }}
+{% if step.evidence %}
+   <pre>{{ step.evidence }}</pre>
+{% endif %}
+{% endfor %}
+
+{% if chain.finding_ids %}
+Related findings: {{ chain.finding_ids | join(", ") }}
+{% endif %}
+{% if chain.notes %}
+{{ chain.notes }}
+{% endif %}
+
+{% endfor %}
+{% else %}
+No cross-module attack chains were identified.
+{% endif %}
+
+## Assets and Services
+
+{% if assets %}
+{% for asset in assets %}
+### {{ asset.host }}
+
+- **IPs:** {{ asset.ips | join(", ") if asset.ips else "unresolved" }}
+- **Operating system:** {{ asset.os or "unknown" }}
+- **CDN / WAF:** {{ asset.cdn or "none detected" }} / {{ asset.waf or "none detected" }}
+- **Favicon hash:** `{{ asset.favicon_hash or "n/a" }}`
+{% if asset.urls %}
+- **URLs:** {{ asset.urls | join(", ") }}
+{% endif %}
+{% if asset.ports %}
+- **Open services:** {% for port in asset.ports %}{{ port.port }}/{{ port.protocol }} {{ port.service }}{% if port.version %} {{ port.version }}{% endif %}{% if not loop.last %}, {% endif %}{% endfor %}
+{% endif %}
+{% if asset.technologies %}
+- **Technologies:** {% for tech in asset.technologies %}{{ tech.name }}{% if tech.version %} {{ tech.version }}{% endif %}{% if not loop.last %}, {% endif %}{% endfor %}
+{% endif %}
+{% if asset.dns.subdomains %}
+- **Subdomains:**
+
+{% for name, ips in asset.dns.subdomains.items() %}
+  - `{{ name }}` → {{ ips | join(", ") }}
+{% endfor %}
+{% endif %}
+
+{% endfor %}
+{% else %}
+No assets were recorded.
+{% endif %}
+
+## API Surfaces
+
+{% if api_surfaces %}
+{% for surface in api_surfaces %}
+### {{ surface.base_url }}
+
+- **Documentation:** {{ surface.docs_urls | join(", ") if surface.docs_urls else "none" }}
+- **GraphQL:** {{ surface.graphql_urls | join(", ") if surface.graphql_urls else "none" }}{% if surface.graphql_introspection %} (introspection enabled){% endif %}
+- **Security schemes:** {{ surface.security_schemes | join(", ") if surface.security_schemes else "none" }}
+- **Endpoints:** {{ surface.endpoints | length }}
+
+{% if surface.endpoints %}
+| Method | Path | Summary |
+| --- | --- | --- |
+{% for endpoint in surface.endpoints[:100] %}
+| {{ endpoint.method }} | `{{ endpoint.url }}` | {{ endpoint.summary | shorter(120) }} |
+{% endfor %}
+{% endif %}
+{% if surface.notes %}
+Notes: {{ surface.notes | join("; ") }}
+{% endif %}
+
+{% endfor %}
+{% else %}
+No API documentation or GraphQL surfaces were discovered.
+{% endif %}
+
+## Discovered Credentials
+
+{% if credentials %}
+Passwords are masked in this report. Raw credentials, when present, are stored only in `credentials.json` for authorized remediation.
+
+| Protocol | Target | Username | Password | Verified |
+| --- | --- | --- | --- | --- |
+{% for credential in credentials %}
+| {{ credential.protocol }} | `{{ credential.target }}` | {{ credential.username }} | {{ credential.password }} | {{ credential.verified_at }} |
+{% endfor %}
+{% else %}
+No credentials were confirmed.
+{% endif %}
+
+## Request Statistics
+
+- **Requests recorded:** {{ request_stats.requests | default(0) }}
+- **Errors:** {{ request_stats.errors | default(0) }}
+- **Bytes read:** {{ request_stats.bytes | default(0) }}
+- **Budget used:** {{ request_stats.budget_used | default(0) }}
+- **Budget remaining:** {{ request_stats.budget_remaining | default(0) }}
+- **By method:** {{ request_stats.by_method | default({}) }}
+
+## Errors and Coverage Gaps
+
+{% if errors %}
+{% for error in errors %}
+- **{{ error.module }}:** {{ error.message }}
+{% endfor %}
+{% else %}
+No module errors were recorded.
+{% endif %}
+
+## Limitations
+
+{% for limitation in limitations %}
+- {{ limitation }}
+{% endfor %}
+
+## Authorized-Use Notice
+
+This report contains security testing results for the named engagement only. Distribution, retesting, or disclosure requires the authorization of the system owner and the engagement sponsor. Do not use these results for denial-of-service, destructive activity, data exfiltration, or any purpose outside the signed scope.

@@ -1,0 +1,4 @@
+# Optional protocol / database integrations.
+# The framework degrades gracefully when these are unavailable.
+impacket>=0.12,<0.14
+pymongo>=4.6,<5

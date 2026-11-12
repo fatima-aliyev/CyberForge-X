@@ -1,0 +1,34 @@
+# Copy this file to scope.yaml and replace every example value with the
+# signed engagement details. Do not remove authorization_ref for a real test.
+
+engagement: "Example Client - External Web Assessment"
+authorized_by: "Example Security Lead"
+authorization_ref: "SOW-2026-001 / ticket SEC-42"
+
+# Hostname scope includes subdomains. CIDR scope is explicit and never
+# expanded implicitly. At least one of allowed_hosts or allowed_cidrs is
+# required.
+allowed_hosts:
+  - app.example.com
+  - "*.example.com"
+allowed_cidrs: []
+
+excluded_hosts:
+  - billing.example.com
+excluded_cidrs: []
+
+# Empty means all TCP ports are allowed by the network scope. The scanner's
+# --ports option still controls which ports recon probes.
+allowed_ports:
+  - 80
+  - 443
+
+# Credential attacks and write tests are denied unless both this file and the
+# command line explicitly enable them.
+allow_credential_attacks: false
+allow_write_tests: false
+
+max_rps: 3
+max_requests: 1500
+
+notes: "Authorized external assessment during the approved maintenance window."

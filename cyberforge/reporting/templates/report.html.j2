@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ engagement }} — {{ tool_name }} Report</title>
+<style>
+  :root { --bg:#f6f7f9; --panel:#fff; --ink:#17202a; --muted:#5d6d7e; --line:#d5dbdb; --accent:#1f618d; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; }
+  main { max-width:1080px; margin:0 auto; padding:32px 20px 64px; }
+  header { background:#17202a; color:#fff; padding:28px 20px; }
+  header .inner { max-width:1080px; margin:0 auto; }
+  h1,h2,h3,h4 { line-height:1.25; }
+  h1 { margin:0 0 6px; font-size:28px; }
+  h2 { margin-top:38px; border-bottom:2px solid var(--line); padding-bottom:8px; }
+  h3 { margin-top:26px; }
+  .muted { color:var(--muted); }
+  .risk { display:inline-block; padding:4px 10px; border-radius:999px; background:#f5b041; color:#17202a; font-weight:700; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin:20px 0; }
+  .metric { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px; }
+  .metric .n { font-size:26px; font-weight:700; }
+  .finding { background:var(--panel); border:1px solid var(--line); border-left:6px solid var(--line); border-radius:8px; padding:18px; margin:16px 0; }
+  .finding.critical { border-left-color:#922b21; }
+  .finding.high { border-left-color:#c0392b; }
+  .finding.medium { border-left-color:#d68910; }
+  .finding.low { border-left-color:#2e86c1; }
+  .finding.info { border-left-color:#7f8c8d; }
+  .badge { display:inline-block; font-size:12px; letter-spacing:.04em; text-transform:uppercase; font-weight:700; padding:3px 8px; border-radius:4px; background:#eaecee; margin-right:6px; }
+  .critical .badge { background:#f5b7b1; }
+  .high .badge { background:#fadbd8; }
+  .medium .badge { background:#fdebd0; }
+  .low .badge { background:#d6eaf8; }
+  .info .badge { background:#e5e8e8; }
+  code, pre { font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:13px; }
+  pre { white-space:pre-wrap; word-break:break-word; background:#f2f4f4; border:1px solid var(--line); border-radius:6px; padding:12px; overflow:auto; max-height:420px; }
+  table { width:100%; border-collapse:collapse; background:var(--panel); margin:12px 0; }
+  th,td { text-align:left; border:1px solid var(--line); padding:8px 10px; vertical-align:top; }
+  th { background:#eaecee; }
+  .target { color:var(--muted); font-size:13px; }
+  .kv { display:grid; grid-template-columns:220px 1fr; gap:4px 14px; }
+  .kv dt { font-weight:700; }
+  .kv dd { margin:0; }
+  section { margin-top:24px; }
+  footer { max-width:1080px; margin:40px auto 0; padding:0 20px; color:var(--muted); font-size:13px; }
+  ul { margin-top:6px; }
+  @media print { body { background:#fff; } header { background:#fff; color:#000; border-bottom:2px solid #000; } .finding, table, .metric { break-inside:avoid; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="inner">
+    <h1>{{ engagement }}</h1>
+    <div>{{ tool_name }} {{ tool_version }} security assessment · {{ generated_at }}</div>
+  </div>
+</header>
+<main>
+  <p><span class="risk">Overall risk: {{ risk_rating }}</span></p>
+  <p class="muted">Authorized, non-destructive testing results. Validate findings before remediation or disclosure. Raw credentials are stored only in the separate protected credentials file.</p>
+
+  <h2>Executive Summary</h2>
+  <p>{{ report.targets | length }} authorized target(s), modules: {{ modules | join(", ") }}. {{ findings_total }} finding(s) recorded. Assessment duration: {{ duration_seconds }} seconds.</p>
+  <div class="grid">
+    <div class="metric"><div class="n">{{ severity_counts.critical }}</div>Critical</div>
+    <div class="metric"><div class="n">{{ severity_counts.high }}</div>High</div>
+    <div class="metric"><div class="n">{{ severity_counts.medium }}</div>Medium</div>
+    <div class="metric"><div class="n">{{ severity_counts.low }}</div>Low</div>
+    <div class="metric"><div class="n">{{ severity_counts.info }}</div>Informational</div>
+  </div>
+
+  <h2>Scope and Authorization</h2>
+  <dl class="kv">
+    <dt>Authorized by</dt><dd>{{ scope.authorized_by | default("not recorded") }}</dd>
+    <dt>Authorization reference</dt><dd>{{ scope.authorization_ref | default("not recorded") }}</dd>
+    <dt>Scope SHA-256</dt><dd><code>{{ scope.scope_sha256 | default("n/a") }}</code></dd>
+    <dt>Allowed hosts</dt><dd>{{ scope.allowed_hosts | join(", ") if scope.allowed_hosts else "none" }}</dd>
+    <dt>Allowed CIDRs</dt><dd>{{ scope.allowed_cidrs | join(", ") if scope.allowed_cidrs else "none" }}</dd>
+    <dt>Excluded hosts</dt><dd>{{ scope.excluded_hosts | join(", ") if scope.excluded_hosts else "none" }}</dd>
+    <dt>Allowed ports</dt><dd>{{ scope.allowed_ports | join(", ") if scope.allowed_ports else "all" }}</dd>
+    <dt>Credential attacks authorized</dt><dd>{{ scope.allow_credential_attacks | default(false) }}</dd>
+    <dt>Write tests authorized</dt><dd>{{ scope.allow_write_tests | default(false) }}</dd>
+    <dt>Targets</dt><dd>{% for target in report.targets %}<code>{{ target }}</code>{% if not loop.last %}<br>{% endif %}{% endfor %}</dd>
+  </dl>
+
+  <h2>Findings</h2>
+  {% if findings_total == 0 %}
+  <p>No findings were recorded. This does not prove absence of vulnerabilities; coverage depends on discovery and access.</p>
+  {% endif %}
+  {% for group in groups %}
+  {% if group.count %}
+  <h3>{{ group.label }} ({{ group.count }})</h3>
+  {% for finding in group.findings %}
+  <article class="finding {{ group.severity }}">
+    <h4><span class="badge">{{ group.label }}</span> {{ finding.title }}</h4>
+    <div class="target">
+      Target: <code>{{ finding.target }}</code> · Module: {{ finding.module }} · CVSS: {{ finding.cvss | cvss }} · Confidence: {{ finding.confidence }} · ID: {{ finding.id }}
+      {% if finding.cve_ids %}<br>CVE: {{ finding.cve_ids | join(", ") }}{% endif %}
+      {% if finding.tags %}<br>Tags: {{ finding.tags | join(", ") }}{% endif %}
+    </div>
+    <p>{{ finding.description }}</p>
+    {% if finding.evidence.payload %}
+    <h4>Evidence — Payload</h4>
+    <pre>{{ finding.evidence.payload }}</pre>
+    {% endif %}
+    {% if finding.evidence.request %}
+    <h4>Evidence — Request</h4>
+    <pre>{{ finding.evidence.request }}</pre>
+    {% endif %}
+    {% if finding.evidence.response_excerpt %}
+    <h4>Evidence — Response / Observation</h4>
+    <pre>{{ finding.evidence.response_excerpt }}</pre>
+    {% endif %}
+    {% if finding.evidence.notes %}
+    <h4>Notes</h4>
+    <p>{{ finding.evidence.notes }}</p>
+    {% endif %}
+    <h4>Remediation</h4>
+    <p>{{ finding.remediation }}</p>
+    {% if finding.reproduction %}
+    <h4>Reproduction</h4>
+    <pre>{{ finding.reproduction }}</pre>
+    {% endif %}
+    {% if finding.references %}
+    <h4>References</h4>
+    <ul>{% for reference in finding.references %}<li>{{ reference }}</li>{% endfor %}</ul>
+    {% endif %}
+  </article>
+  {% endfor %}
+  {% endif %}
+  {% endfor %}
+
+  <h2>Attack Chains</h2>
+  {% if chains %}
+  {% for chain in chains %}
+  <article class="finding info">
+    <h4>{{ chain.name }}</h4>
+    <div class="target">Target: <code>{{ chain.target }}</code> · Executed: {{ chain.executed }}</div>
+    <p>{{ chain.description }}</p>
+    <ol>
+      {% for step in chain.steps %}
+      <li><strong>{{ step.action }}</strong> — {{ step.result }}
+        {% if step.evidence %}<pre>{{ step.evidence }}</pre>{% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+    {% if chain.finding_ids %}<p class="muted">Related findings: {{ chain.finding_ids | join(", ") }}</p>{% endif %}
+    {% if chain.notes %}<p>{{ chain.notes }}</p>{% endif %}
+  </article>
+  {% endfor %}
+  {% else %}
+  <p>No cross-module attack chains were identified.</p>
+  {% endif %}
+
+  <h2>Assets and Services</h2>
+  {% if assets %}
+  {% for asset in assets %}
+  <article class="finding info">
+    <h4>{{ asset.host }}</h4>
+    <p>IPs: {{ asset.ips | join(", ") if asset.ips else "unresolved" }} · OS: {{ asset.os or "unknown" }} · CDN: {{ asset.cdn or "none" }} · WAF: {{ asset.waf or "none" }}</p>
+    {% if asset.urls %}<p>URLs: {{ asset.urls | join(", ") }}</p>{% endif %}
+    {% if asset.ports %}
+    <table>
+      <thead><tr><th>Port</th><th>Service</th><th>Version/Banner</th></tr></thead>
+      <tbody>
+      {% for port in asset.ports %}
+      <tr><td>{{ port.port }}/{{ port.protocol }}</td><td>{{ port.service }}{% if port.tls %} (TLS){% endif %}</td><td>{{ port.version }} {{ port.banner | shorter(180) }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+    {% if asset.technologies %}
+    <p>Technologies: {% for tech in asset.technologies %}{{ tech.name }}{% if tech.version %} {{ tech.version }}{% endif %}{% if not loop.last %}, {% endif %}{% endfor %}</p>
+    {% endif %}
+    {% if asset.dns.subdomains %}
+    <details><summary>Subdomains ({{ asset.dns.subdomains | length }})</summary>
+      <ul>{% for name, ips in asset.dns.subdomains.items() %}<li><code>{{ name }}</code> → {{ ips | join(", ") }}</li>{% endfor %}</ul>
+    </details>
+    {% endif %}
+  </article>
+  {% endfor %}
+  {% else %}
+  <p>No assets were recorded.</p>
+  {% endif %}
+
+  <h2>API Surfaces</h2>
+  {% if api_surfaces %}
+  {% for surface in api_surfaces %}
+  <article class="finding info">
+    <h4>{{ surface.base_url }}</h4>
+    <p>Documentation: {{ surface.docs_urls | join(", ") if surface.docs_urls else "none" }} · GraphQL: {{ surface.graphql_urls | join(", ") if surface.graphql_urls else "none" }}{% if surface.graphql_introspection %} (introspection enabled){% endif %}</p>
+    <p>Security schemes: {{ surface.security_schemes | join(", ") if surface.security_schemes else "none" }}</p>
+    <table>
+      <thead><tr><th>Method</th><th>Endpoint</th><th>Summary</th></tr></thead>
+      <tbody>
+      {% for endpoint in surface.endpoints[:100] %}
+      <tr><td>{{ endpoint.method }}</td><td><code>{{ endpoint.url }}</code></td><td>{{ endpoint.summary | shorter(160) }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </article>
+  {% endfor %}
+  {% else %}
+  <p>No API documentation or GraphQL surfaces were discovered.</p>
+  {% endif %}
+
+  <h2>Discovered Credentials</h2>
+  {% if credentials %}
+  <p>Passwords are masked here. Raw values are stored only in <code>credentials.json</code> for authorized remediation.</p>
+  <table>
+    <thead><tr><th>Protocol</th><th>Target</th><th>Username</th><th>Password</th><th>Verified</th></tr></thead>
+    <tbody>
+    {% for credential in credentials %}
+    <tr><td>{{ credential.protocol }}</td><td><code>{{ credential.target }}</code></td><td>{{ credential.username }}</td><td>{{ credential.password }}</td><td>{{ credential.verified_at }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>No credentials were confirmed.</p>
+  {% endif %}
+
+  <h2>Request Statistics</h2>
+  <pre>{{ request_stats | tojson(indent=2) }}</pre>
+
+  <h2>Errors and Coverage Gaps</h2>
+  {% if errors %}
+  <ul>{% for error in errors %}<li><strong>{{ error.module }}:</strong> {{ error.message }}</li>{% endfor %}</ul>
+  {% else %}
+  <p>No module errors were recorded.</p>
+  {% endif %}
+
+  <h2>Limitations</h2>
+  <ul>{% for limitation in limitations %}<li>{{ limitation }}</li>{% endfor %}</ul>
+
+  <footer>
+    <p>Authorized-use only. This report covers the named engagement and scope. Distribution or retesting requires authorization from the system owner and engagement sponsor. Do not use these results for denial-of-service, data destruction, data exfiltration, persistence, or activity outside the signed scope.</p>
+  </footer>
+</main>
+</body>
+</html>
